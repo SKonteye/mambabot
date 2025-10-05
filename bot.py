@@ -3,6 +3,9 @@ import os
 import logging
 import base64
 import asyncio
+import subprocess
+import tempfile
+import json
 from io import BytesIO
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
@@ -23,19 +26,114 @@ logger = logging.getLogger(__name__)
 # Get tokens from environment
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY')
+USE_CLI = os.getenv('USE_CLAUDE_CLI', 'false').lower() == 'true'
 
-if not TELEGRAM_TOKEN or not ANTHROPIC_API_KEY:
-    raise ValueError('Missing required environment variables: TELEGRAM_BOT_TOKEN and ANTHROPIC_API_KEY')
+if not TELEGRAM_TOKEN:
+    raise ValueError('Missing required environment variable: TELEGRAM_BOT_TOKEN')
+
+if not USE_CLI and not ANTHROPIC_API_KEY:
+    raise ValueError('Missing required environment variable: ANTHROPIC_API_KEY (required when USE_CLAUDE_CLI=false)')
 
 # Set Anthropic API key for the SDK
-os.environ['ANTHROPIC_API_KEY'] = ANTHROPIC_API_KEY
+if not USE_CLI:
+    os.environ['ANTHROPIC_API_KEY'] = ANTHROPIC_API_KEY
 
 # Store conversation history per chat
 conversations = {}
 
+# Store Claude CLI session directories per chat
+claude_session_dirs = {}
+
 # Store pending tool approvals
 pending_approvals = {}
 approval_events = {}
+
+
+def get_or_create_session_dir(chat_id: int) -> str:
+    """
+    Get or create a session directory for the Claude CLI to maintain context
+
+    Args:
+        chat_id: Telegram chat ID
+
+    Returns:
+        Path to the session directory
+    """
+    if chat_id in claude_session_dirs:
+        return claude_session_dirs[chat_id]
+
+    # Create a session directory for this chat
+    session_dir = os.path.join(tempfile.gettempdir(), f'claude_telegram_session_{chat_id}')
+    os.makedirs(session_dir, exist_ok=True)
+
+    claude_session_dirs[chat_id] = session_dir
+    logger.info(f"Created Claude session directory for chat {chat_id}: {session_dir}")
+
+    return session_dir
+
+
+async def run_claude_cli(chat_id: int, prompt: str) -> str:
+    """
+    Send a prompt to Claude CLI, maintaining session context per chat
+
+    Args:
+        chat_id: Telegram chat ID
+        prompt: The prompt to send to Claude
+
+    Returns:
+        Claude's response as a string
+    """
+    try:
+        # Get or create session directory for this chat
+        session_dir = get_or_create_session_dir(chat_id)
+
+        # Build the command - claude will maintain context in the session directory
+        cmd = ['claude', prompt]
+        env = os.environ.copy()
+
+        logger.info(f"Running Claude CLI for chat {chat_id} in session dir: {session_dir}")
+
+        # Run claude command in the session directory
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=session_dir,
+            env=env
+        )
+
+        stdout, stderr = await process.communicate()
+
+        if process.returncode != 0:
+            error_msg = stderr.decode('utf-8').strip()
+            logger.error(f"Claude CLI error: {error_msg}")
+            return f"❌ Claude CLI error: {error_msg}"
+
+        response = stdout.decode('utf-8').strip()
+        return response
+
+    except FileNotFoundError:
+        return "❌ Claude CLI not found. Please make sure 'claude' command is installed and available in your PATH."
+    except Exception as e:
+        logger.error(f"Error running Claude CLI: {e}")
+        return f"❌ Error: {str(e)}"
+
+
+def clear_claude_session(chat_id: int):
+    """Clear the Claude CLI session directory for a chat"""
+    if chat_id in claude_session_dirs:
+        session_dir = claude_session_dirs[chat_id]
+
+        try:
+            # Remove the session directory and all its contents
+            import shutil
+            if os.path.exists(session_dir):
+                shutil.rmtree(session_dir)
+            logger.info(f"Cleared Claude session directory for chat {chat_id}")
+        except Exception as e:
+            logger.error(f"Error clearing session directory: {e}")
+
+        del claude_session_dirs[chat_id]
 
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -63,6 +161,11 @@ async def clear_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /clear command"""
     chat_id = update.effective_chat.id
     conversations[chat_id] = []
+
+    # Also clear Claude CLI session if using CLI mode
+    if USE_CLI:
+        clear_claude_session(chat_id)
+
     await update.message.reply_text("🗑️ Conversation history cleared!")
 
 
@@ -471,37 +574,46 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             prompt = text
 
-        # Use bypassPermissions mode to auto-approve all tool uses
-        options = ClaudeAgentOptions(
-            permission_mode='bypassPermissions'  # Auto-approve all tools
-        )
-
         assistant_message = ""
         images = []
 
-        async for message in query(prompt=prompt, options=options):
-            # Only process TextResult messages with actual content
-            if hasattr(message, 'result') and message.result:
-                assistant_message += str(message.result)
-            # Check if message has content blocks (list format)
-            elif hasattr(message, 'content') and isinstance(message.content, list):
-                for content in message.content:
-                    if hasattr(content, 'type'):
-                        if content.type == 'text':
-                            assistant_message += content.text
-                        elif content.type == 'image':
-                            # Handle image content
-                            if hasattr(content, 'source'):
-                                if content.source.type == 'base64':
-                                    images.append({
-                                        'data': content.source.data,
-                                        'media_type': content.source.media_type
-                                    })
-                                elif content.source.type == 'url':
-                                    images.append({
-                                        'url': content.source.url
-                                    })
-            # Skip system messages and metadata
+        # Choose between CLI and SDK based on configuration
+        if USE_CLI:
+            # Use globally installed Claude CLI with persistent session
+            logger.info("Using Claude CLI mode")
+            assistant_message = await run_claude_cli(chat_id, prompt)
+        else:
+            # Use SDK (original behavior)
+            logger.info("Using Claude SDK mode")
+
+            # Use bypassPermissions mode to auto-approve all tool uses
+            options = ClaudeAgentOptions(
+                permission_mode='bypassPermissions'  # Auto-approve all tools
+            )
+
+            async for message in query(prompt=prompt, options=options):
+                # Only process TextResult messages with actual content
+                if hasattr(message, 'result') and message.result:
+                    assistant_message += str(message.result)
+                # Check if message has content blocks (list format)
+                elif hasattr(message, 'content') and isinstance(message.content, list):
+                    for content in message.content:
+                        if hasattr(content, 'type'):
+                            if content.type == 'text':
+                                assistant_message += content.text
+                            elif content.type == 'image':
+                                # Handle image content
+                                if hasattr(content, 'source'):
+                                    if content.source.type == 'base64':
+                                        images.append({
+                                            'data': content.source.data,
+                                            'media_type': content.source.media_type
+                                        })
+                                    elif content.source.type == 'url':
+                                        images.append({
+                                            'url': content.source.url
+                                        })
+                # Skip system messages and metadata
 
         assistant_message = assistant_message.strip()
 

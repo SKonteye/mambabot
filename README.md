@@ -15,7 +15,9 @@ A Telegram bot that connects to Claude Code Agent SDK to help you with coding ta
 
 - Python 3.8 or higher
 - A Telegram account
-- An Anthropic API key
+- **Either:**
+  - An Anthropic API key (for SDK mode), **OR**
+  - Globally installed Claude CLI (for CLI mode)
 
 ## Setup Instructions
 
@@ -60,8 +62,24 @@ cp .env.example .env
 
 # Edit .env and add your tokens
 # TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
-# ANTHROPIC_API_KEY=your_anthropic_api_key_here
+# ANTHROPIC_API_KEY=your_anthropic_api_key_here  (only if USE_CLAUDE_CLI=false)
+# USE_CLAUDE_CLI=false  (set to 'true' to use globally installed claude command)
 ```
+
+#### Choosing Between SDK and CLI Mode
+
+**SDK Mode** (default):
+- Set `USE_CLAUDE_CLI=false` in `.env`
+- Requires `ANTHROPIC_API_KEY`
+- Uses the Claude Agent SDK library
+- Good for API-based integration
+
+**CLI Mode**:
+- Set `USE_CLAUDE_CLI=true` in `.env`
+- Requires globally installed `claude` command
+- Uses your system's Claude CLI installation
+- Good if you already have Claude CLI configured
+- To install Claude CLI, visit: https://docs.claude.com/claude-code
 
 ### 5. Run the Bot
 
@@ -97,7 +115,9 @@ Simply send messages to your bot:
 ## How It Works
 
 1. You send a message to the bot on Telegram
-2. The bot forwards your message to the Claude Agent SDK using the `query()` function
+2. The bot forwards your message to Claude:
+   - **SDK Mode**: Uses the Claude Agent SDK `query()` function
+   - **CLI Mode**: Executes the globally installed `claude` command
 3. Claude processes your request with access to agent tools (file operations, bash commands, etc.)
 4. The bot sends Claude's response back to you
 5. Conversation history is maintained for context
@@ -132,11 +152,12 @@ Projet telegram/
 
 ## Notes
 
-- This bot uses the Claude Agent SDK which provides access to powerful agent tools
+- This bot can use either the Claude Agent SDK or your globally installed Claude CLI
+- In CLI mode, the bot executes the `claude` command from your system
 - Conversation history is stored in memory and will be lost when the bot restarts
 - The bot keeps the last 10 message exchanges (20 messages total) for context
 - Long responses are automatically split to fit Telegram's message limits
-- The bot uses Claude Sonnet 4.5 model through the Agent SDK
+- The bot uses Claude Sonnet 4.5 model (exact model depends on your configuration)
 
 ## Security
 
