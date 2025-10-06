@@ -80,6 +80,8 @@ cp .env.example .env
 - Uses your system's Claude CLI installation
 - Good if you already have Claude CLI configured
 - To install Claude CLI, visit: https://docs.claude.com/claude-code
+- Automatically uses `--permission-mode bypassPermissions` to auto-approve all tool usage
+- Each chat gets its own persistent session directory until `/clear` is called
 
 ### 5. Run the Bot
 

@@ -9,8 +9,6 @@ import json
 from io import BytesIO
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
-from claude_agent_sdk import query
-from claude_agent_sdk.types import ClaudeAgentOptions, PermissionResultAllow, PermissionResultDeny
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -34,9 +32,14 @@ if not TELEGRAM_TOKEN:
 if not USE_CLI and not ANTHROPIC_API_KEY:
     raise ValueError('Missing required environment variable: ANTHROPIC_API_KEY (required when USE_CLAUDE_CLI=false)')
 
-# Set Anthropic API key for the SDK
+# Only import and configure SDK if not using CLI mode
 if not USE_CLI:
+    from claude_agent_sdk import query
+    from claude_agent_sdk.types import ClaudeAgentOptions, PermissionResultAllow, PermissionResultDeny
     os.environ['ANTHROPIC_API_KEY'] = ANTHROPIC_API_KEY
+    logger.info("Using Claude SDK mode")
+else:
+    logger.info("Using Claude CLI mode - SDK will not be loaded")
 
 # Store conversation history per chat
 conversations = {}
@@ -87,8 +90,8 @@ async def run_claude_cli(chat_id: int, prompt: str) -> str:
         # Get or create session directory for this chat
         session_dir = get_or_create_session_dir(chat_id)
 
-        # Build the command - claude will maintain context in the session directory
-        cmd = ['claude', prompt]
+        # Build the command with bypassPermissions mode to auto-approve all tools
+        cmd = ['claude', '--permission-mode', 'bypassPermissions', prompt]
         env = os.environ.copy()
 
         logger.info(f"Running Claude CLI for chat {chat_id} in session dir: {session_dir}")
@@ -221,37 +224,46 @@ async def process_with_file(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         else:
             full_prompt = f"{text}\n\nFile content:\n{file_content[:4000]}"
 
-        # Use bypassPermissions mode
-        options = ClaudeAgentOptions(
-            permission_mode='bypassPermissions'
-        )
-
         assistant_message = ""
         images = []
 
-        # Send to Claude
-        async for message in query(prompt=full_prompt, options=options):
-            # Only process TextResult messages with actual content
-            if hasattr(message, 'result') and message.result:
-                assistant_message += str(message.result)
-            # Check if message has content blocks (list format)
-            elif hasattr(message, 'content') and isinstance(message.content, list):
-                for content in message.content:
-                    if hasattr(content, 'type'):
-                        if content.type == 'text':
-                            assistant_message += content.text
-                        elif content.type == 'image':
-                            # Handle image content from Claude
-                            if hasattr(content, 'source'):
-                                if content.source.type == 'base64':
-                                    images.append({
-                                        'data': content.source.data,
-                                        'media_type': content.source.media_type
-                                    })
-                                elif content.source.type == 'url':
-                                    images.append({
-                                        'url': content.source.url
-                                    })
+        # Choose between CLI and SDK based on configuration
+        if USE_CLI:
+            # Use globally installed Claude CLI with persistent session
+            logger.info("Using Claude CLI mode for file processing")
+            assistant_message = await run_claude_cli(chat_id, full_prompt)
+        else:
+            # Use SDK (original behavior)
+            logger.info("Using Claude SDK mode for file processing")
+
+            # Use bypassPermissions mode
+            options = ClaudeAgentOptions(
+                permission_mode='bypassPermissions'
+            )
+
+            # Send to Claude
+            async for message in query(prompt=full_prompt, options=options):
+                # Only process TextResult messages with actual content
+                if hasattr(message, 'result') and message.result:
+                    assistant_message += str(message.result)
+                # Check if message has content blocks (list format)
+                elif hasattr(message, 'content') and isinstance(message.content, list):
+                    for content in message.content:
+                        if hasattr(content, 'type'):
+                            if content.type == 'text':
+                                assistant_message += content.text
+                            elif content.type == 'image':
+                                # Handle image content from Claude
+                                if hasattr(content, 'source'):
+                                    if content.source.type == 'base64':
+                                        images.append({
+                                            'data': content.source.data,
+                                            'media_type': content.source.media_type
+                                        })
+                                    elif content.source.type == 'url':
+                                        images.append({
+                                            'url': content.source.url
+                                        })
 
         assistant_message = assistant_message.strip()
 
@@ -329,37 +341,46 @@ async def process_with_image(update: Update, context: ContextTypes.DEFAULT_TYPE,
         else:
             full_prompt = f"{text}\n\nUser has sent an image saved at: {temp_image_path}\nPlease analyze this image and respond to the user's request."
 
-        # Use bypassPermissions mode
-        options = ClaudeAgentOptions(
-            permission_mode='bypassPermissions'
-        )
-
         assistant_message = ""
         images = []
 
-        # Send to Claude
-        async for message in query(prompt=full_prompt, options=options):
-            # Only process TextResult messages with actual content
-            if hasattr(message, 'result') and message.result:
-                assistant_message += str(message.result)
-            # Check if message has content blocks (list format)
-            elif hasattr(message, 'content') and isinstance(message.content, list):
-                for content in message.content:
-                    if hasattr(content, 'type'):
-                        if content.type == 'text':
-                            assistant_message += content.text
-                        elif content.type == 'image':
-                            # Handle image content from Claude
-                            if hasattr(content, 'source'):
-                                if content.source.type == 'base64':
-                                    images.append({
-                                        'data': content.source.data,
-                                        'media_type': content.source.media_type
-                                    })
-                                elif content.source.type == 'url':
-                                    images.append({
-                                        'url': content.source.url
-                                    })
+        # Choose between CLI and SDK based on configuration
+        if USE_CLI:
+            # Use globally installed Claude CLI with persistent session
+            logger.info("Using Claude CLI mode for image processing")
+            assistant_message = await run_claude_cli(chat_id, full_prompt)
+        else:
+            # Use SDK (original behavior)
+            logger.info("Using Claude SDK mode for image processing")
+
+            # Use bypassPermissions mode
+            options = ClaudeAgentOptions(
+                permission_mode='bypassPermissions'
+            )
+
+            # Send to Claude
+            async for message in query(prompt=full_prompt, options=options):
+                # Only process TextResult messages with actual content
+                if hasattr(message, 'result') and message.result:
+                    assistant_message += str(message.result)
+                # Check if message has content blocks (list format)
+                elif hasattr(message, 'content') and isinstance(message.content, list):
+                    for content in message.content:
+                        if hasattr(content, 'type'):
+                            if content.type == 'text':
+                                assistant_message += content.text
+                            elif content.type == 'image':
+                                # Handle image content from Claude
+                                if hasattr(content, 'source'):
+                                    if content.source.type == 'base64':
+                                        images.append({
+                                            'data': content.source.data,
+                                            'media_type': content.source.media_type
+                                        })
+                                    elif content.source.type == 'url':
+                                        images.append({
+                                            'url': content.source.url
+                                        })
 
         assistant_message = assistant_message.strip()
 

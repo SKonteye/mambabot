@@ -1,4 +1,7 @@
 python-telegram-bot==21.9
-claude-agent-sdk
 python-dotenv==1.0.1
-anyio
+
+# Only required if USE_CLAUDE_CLI=false (SDK mode)
+# Uncomment if using SDK mode:
+# claude-agent-sdk
+# anyio
