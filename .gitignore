@@ -1,5 +1,7 @@
 # Environment variables
 .env
+.env.local
+.env.*.local
 
 # Python
 __pycache__/
@@ -13,10 +15,50 @@ ENV/
 *.egg-info/
 dist/
 build/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+.installed.cfg
+*.egg
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
 .DS_Store
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+temp/
+tmp/
+
+# Session directories
+claude_telegram_session_*
+claude_telegram_persistent/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json

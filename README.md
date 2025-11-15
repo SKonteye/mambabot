@@ -119,10 +119,21 @@ Simply send messages to your bot:
 1. You send a message to the bot on Telegram
 2. The bot forwards your message to Claude:
    - **SDK Mode**: Uses the Claude Agent SDK `query()` function
-   - **CLI Mode**: Executes the globally installed `claude` command
+   - **CLI Mode**: Sends messages to a persistent Claude CLI process via stdin/stdout pipes
 3. Claude processes your request with access to agent tools (file operations, bash commands, etc.)
 4. The bot sends Claude's response back to you
 5. Conversation history is maintained for context
+
+### CLI Mode Architecture
+
+When using CLI mode (`USE_CLAUDE_CLI=true`), the bot uses Claude CLI's `--print` mode for efficient non-interactive communication:
+
+- **Print Mode**: Uses `claude --print --continue` for non-interactive output
+- **Session Continuity**: `--continue` flag maintains conversation context across messages
+- **Shared Session Directory**: All messages use the same session directory for context persistence
+- **Concurrent Handling**: AsyncIO lock ensures safe concurrent access from multiple users
+- **Auto-approval**: `--permission-mode bypassPermissions` auto-approves all tool usage
+- **Clean Architecture**: No persistent process to manage - each message spawns a process that exits cleanly
 
 ## Project Structure
 
@@ -155,7 +166,11 @@ Projet telegram/
 ## Notes
 
 - This bot can use either the Claude Agent SDK or your globally installed Claude CLI
-- In CLI mode, the bot executes the `claude` command from your system
+- In CLI mode, the bot uses **`--print` mode** for efficient communication
+  - Each message spawns a `claude` process that completes and exits
+  - Uses `--continue` flag to maintain session context across messages
+  - Shared session directory keeps conversation history
+  - AsyncIO lock serializes concurrent requests for thread safety
 - Conversation history is stored in memory and will be lost when the bot restarts
 - The bot keeps the last 10 message exchanges (20 messages total) for context
 - Long responses are automatically split to fit Telegram's message limits
