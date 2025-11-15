@@ -1,15 +1,19 @@
-# Telegram Claude Agent Bot
+# Telegram Claude Code Bot
 
-A Telegram bot that connects to Claude Code Agent SDK to help you with coding tasks, directly from Telegram.
+A Telegram bot that gives you **remote access to Claude Code** running on your computer. Control your local machine through Telegram messages with full access to Claude Code's agent capabilities - **all tool permissions automatically approved**.
 
-## Features
+⚠️ **Security Warning**: This bot has unrestricted access to your computer via Claude Code. Only use it for personal use and keep your bot token private. Anyone with access to your Telegram bot can execute commands on your machine.
 
-- 💬 Natural conversation with Claude AI
-- 🔧 Code generation and debugging
-- 📝 File operations and project analysis
-- 🛠️ Access to Claude Code agent tools
-- 🤖 Context-aware responses
-- 📜 Conversation history management
+## What This Bot Does
+
+- 🖥️ **Remote Computer Access**: Control Claude Code on your machine from anywhere via Telegram
+- 🔓 **Permission-Free Operation**: All Claude Code tools auto-approved (file operations, bash commands, code execution)
+- 📁 **Full File System Access**: Read, write, and modify files on your computer
+- 💻 **Command Execution**: Run bash commands and scripts through Claude
+- 🔧 **Code Operations**: Generate, debug, and refactor code with full project context
+- 📸 **Screenshot Capture**: Take and analyze screenshots remotely
+- 🖼️ **Image Analysis**: Send images for Claude to analyze
+- 🤖 **Persistent Sessions**: Maintains conversation context across messages
 
 ## Prerequisites
 
@@ -116,43 +120,77 @@ Simply send messages to your bot:
 
 ## How It Works
 
-1. You send a message to the bot on Telegram
-2. The bot forwards your message to Claude:
-   - **SDK Mode**: Uses the Claude Agent SDK `query()` function
-   - **CLI Mode**: Sends messages to a persistent Claude CLI process via stdin/stdout pipes
-3. Claude processes your request with access to agent tools (file operations, bash commands, etc.)
-4. The bot sends Claude's response back to you
-5. Conversation history is maintained for context
+1. **You send a message** to your bot on Telegram from anywhere
+2. **Bot forwards to Claude Code** running on your computer:
+   - **SDK Mode**: Uses Claude Agent SDK with `bypassPermissions`
+   - **CLI Mode**: Uses `claude --permission-mode bypassPermissions` (recommended)
+3. **Claude executes with full access**:
+   - Reads/writes files on your computer
+   - Runs bash commands and scripts
+   - Accesses your project files
+   - Takes screenshots
+   - **No permission prompts** - everything is auto-approved
+4. **Response sent back** to you on Telegram
+5. **Conversation context maintained** across messages
 
-### CLI Mode Architecture
+### CLI Mode Architecture (Recommended)
 
-When using CLI mode (`USE_CLAUDE_CLI=true`), the bot uses Claude CLI's `--print` mode for efficient non-interactive communication:
+When using CLI mode (`USE_CLAUDE_CLI=true`), the bot leverages Claude Code's full capabilities:
 
+- **Permission Mode**: `--permission-mode bypassPermissions` auto-approves ALL tool usage
 - **Print Mode**: Uses `claude --print --continue` for non-interactive output
 - **Session Continuity**: `--continue` flag maintains conversation context across messages
-- **Shared Session Directory**: All messages use the same session directory for context persistence
-- **Concurrent Handling**: AsyncIO lock ensures safe concurrent access from multiple users
-- **Auto-approval**: `--permission-mode bypassPermissions` auto-approves all tool usage
-- **Clean Architecture**: No persistent process to manage - each message spawns a process that exits cleanly
+- **Shared Session Directory**: Persistent session keeps conversation history
+- **Concurrent Safe**: AsyncIO lock ensures safe concurrent access
+- **Clean Architecture**: Each message spawns a process that exits cleanly
+
+### What Claude Can Do (Auto-Approved)
+
+- ✅ Read any file on your computer
+- ✅ Write/modify/delete files
+- ✅ Execute bash commands
+- ✅ Install packages
+- ✅ Run scripts
+- ✅ Access network
+- ✅ Take screenshots
+- ✅ Search your filesystem
 
 ## Project Structure
 
 ```
-Projet telegram/
-├── bot.py              # Main bot application
-├── requirements.txt    # Python dependencies
-├── .env.example       # Environment variables template
-├── .env               # Your actual environment variables (not in git)
-├── .gitignore         # Git ignore file
-└── README.md          # This file
+telegram-claude-bot/
+├── src/
+│   └── telegram_claude_bot/        # Main package
+│       ├── __init__.py
+│       ├── bot.py                  # Main application
+│       ├── config.py               # Configuration management
+│       ├── utils.py                # Utility functions
+│       ├── claude_manager.py       # Claude CLI integration
+│       ├── screenshot.py           # Screenshot functionality
+│       ├── session.py              # Session management
+│       └── handlers/               # Message handlers
+│           ├── __init__.py
+│           ├── commands.py         # Command handlers
+│           ├── messages.py         # Message processing
+│           └── errors.py           # Error handling
+├── run_bot.py                      # Entry point (use this to start)
+├── test_bot.py                     # Test suite
+├── test_config.py                  # Configuration tests
+├── requirements.txt                # Python dependencies
+├── .env.example                    # Environment template
+├── .env                            # Your tokens (not in git)
+├── .gitignore                      # Git exclusions
+├── LICENSE                         # MIT License
+└── README.md                       # This file
 ```
 
 ## Troubleshooting
 
 ### Bot doesn't respond
-- Check that your bot is running (`python bot.py`)
+- Check that your bot is running (`python3 run_bot.py`)
 - Verify your tokens are correct in `.env`
 - Check the console for error messages
+- Run tests: `python3 test_bot.py`
 
 ### API errors
 - Ensure your Anthropic API key is valid
@@ -178,9 +216,56 @@ Projet telegram/
 
 ## Security
 
-- Never commit your `.env` file to version control
-- Keep your bot token and API key private
-- The `.gitignore` file is configured to exclude sensitive files
+### ⚠️ Important Security Considerations
+
+**This bot has UNRESTRICTED access to your computer.** Anyone who can message your Telegram bot can:
+- Read all your files
+- Execute arbitrary commands
+- Modify or delete data
+- Install software
+- Access your network
+
+### Recommended Security Measures
+
+1. **Keep Bot Token Private**:
+   - Never share your Telegram bot token
+   - Never commit `.env` to version control
+   - Treat it like a password to your computer
+
+2. **Restrict Bot Access**:
+   - Only use this bot for personal use
+   - Consider adding Telegram username whitelist in the code
+   - Don't share your bot username with others
+
+3. **Network Security**:
+   - Run on a trusted network
+   - Consider using a firewall
+   - Be aware of what files/data are accessible
+
+4. **Monitor Usage**:
+   - Check bot logs regularly
+   - Review conversation history
+   - Watch for unexpected behavior
+
+5. **Environment Variables**:
+   - Never commit `.env` file (already in `.gitignore`)
+   - Keep API keys and tokens secure
+   - Rotate credentials if compromised
+
+### Use Cases
+
+✅ **Good for**:
+- Personal automation and remote access to your machine
+- Coding assistance when away from your computer
+- File management and quick tasks
+- Screenshot monitoring
+- Learning and experimentation
+
+❌ **NOT suitable for**:
+- Production environments
+- Shared computers
+- Processing sensitive data without additional security
+- Public/multi-user scenarios
 
 ## License
 
