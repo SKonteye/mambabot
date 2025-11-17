@@ -20,29 +20,46 @@ class ClaudeProcessManager:
     def __init__(self):
         """Initialize the Claude process manager."""
         self.lock = asyncio.Lock()
-        self.session_dir: Optional[str] = None
+        # Track session directories per chat_id
+        self.session_dirs: dict[int, str] = {}
+
+    def _get_session_dir(self, chat_id: int) -> str:
+        """
+        Get or create session directory for a specific chat.
+
+        Args:
+            chat_id: Telegram chat ID
+
+        Returns:
+            Path to the session directory
+        """
+        if chat_id not in self.session_dirs:
+            # Create a persistent session directory for this chat
+            session_dir = os.path.join(
+                tempfile.gettempdir(),
+                f'claude_telegram_chat_{chat_id}'
+            )
+            os.makedirs(session_dir, exist_ok=True)
+            self.session_dirs[chat_id] = session_dir
+            logger.info(f"✓ Created Claude CLI session directory for chat {chat_id}: {session_dir}")
+
+        return self.session_dirs[chat_id]
 
     async def start(self):
-        """Initialize session directory for Claude CLI."""
+        """Initialize the Claude process manager."""
         try:
-            logger.info("Initializing Claude CLI session directory...")
-
-            # Create a persistent session directory
-            self.session_dir = os.path.join(tempfile.gettempdir(), 'claude_telegram_persistent')
-            os.makedirs(self.session_dir, exist_ok=True)
-
-            logger.info(f"✓ Claude CLI session directory ready: {self.session_dir}")
-
+            logger.info("Claude CLI process manager initialized")
         except Exception as e:
-            logger.error(f"Error initializing Claude session: {e}")
+            logger.error(f"Error initializing Claude process manager: {e}")
             raise
 
-    async def send_prompt(self, prompt: str, timeout: Optional[float] = None) -> str:
+    async def send_prompt(self, prompt: str, chat_id: int, timeout: Optional[float] = None) -> str:
         """
         Send a prompt to Claude CLI using --print mode (non-interactive).
 
         Args:
             prompt: The prompt to send
+            chat_id: Telegram chat ID for session isolation
             timeout: Maximum time to wait for response (uses config default if None)
 
         Returns:
@@ -53,26 +70,28 @@ class ClaudeProcessManager:
 
         async with self.lock:
             try:
-                if not self.session_dir:
-                    await self.start()
+                # Get the session directory for this specific chat
+                session_dir = self._get_session_dir(chat_id)
 
                 # Use --print mode for non-interactive output with --continue to maintain session
+                # Use permission mode from config
+                permission_arg = 'bypassPermissions' if config.permission_mode == 'bypass' else 'default'
                 cmd = [
                     'claude',
                     '--print',
-                    '--permission-mode', 'bypassPermissions',
+                    '--permission-mode', permission_arg,
                     '--continue',  # Continue the most recent conversation
                     prompt
                 ]
 
-                logger.info("Sending prompt to Claude CLI (--print mode)")
+                logger.info(f"Sending prompt to Claude CLI (--print mode) for chat {chat_id}")
 
                 # Run claude command in the session directory
                 process = await asyncio.create_subprocess_exec(
                     *cmd,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
-                    cwd=self.session_dir
+                    cwd=session_dir
                 )
 
                 try:
@@ -104,14 +123,35 @@ class ClaudeProcessManager:
         """Cleanup session directory."""
         logger.info("Claude CLI session cleanup (no persistent process to stop)")
 
+    def clear_chat_session(self, chat_id: int) -> None:
+        """
+        Clear the session directory for a specific chat.
+
+        Args:
+            chat_id: Telegram chat ID
+        """
+        import shutil
+
+        if chat_id in self.session_dirs:
+            session_dir = self.session_dirs[chat_id]
+            try:
+                if os.path.exists(session_dir):
+                    shutil.rmtree(session_dir)
+                    logger.info(f"✓ Cleared Claude CLI session for chat {chat_id}")
+            except Exception as e:
+                logger.error(f"Error clearing session for chat {chat_id}: {e}")
+
+            # Remove from tracking
+            del self.session_dirs[chat_id]
+
     def is_alive(self) -> bool:
         """
-        Check if session is initialized.
+        Check if process manager is initialized.
 
         Returns:
-            True if session directory is initialized
+            True (manager is always ready)
         """
-        return self.session_dir is not None
+        return True
 
 
 # Global Claude process manager instance

@@ -5,7 +5,7 @@ Sets up and runs the Telegram bot with all handlers.
 
 import logging
 from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 
 from .config import config
 from .handlers import (
@@ -14,7 +14,8 @@ from .handlers import (
     help_command,
     screenshot_command,
     handle_message,
-    error_handler
+    error_handler,
+    handle_permission_callback
 )
 from .claude_manager import get_claude_manager, shutdown_claude_manager
 
@@ -66,6 +67,9 @@ def main():
     application.add_handler(CommandHandler("clear", clear_command))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("screenshot", screenshot_command))
+
+    # Add callback query handler for permission approvals
+    application.add_handler(CallbackQueryHandler(handle_permission_callback))
 
     # Add message handlers
     application.add_handler(MessageHandler(filters.PHOTO, handle_message))

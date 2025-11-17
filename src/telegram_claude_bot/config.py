@@ -22,6 +22,7 @@ class BotConfig:
     telegram_token: str
     anthropic_api_key: Optional[str]
     use_cli: bool
+    permission_mode: str = 'interactive'  # 'interactive' or 'bypass'
     max_history_length: int = 20
     max_message_length: int = 4000
     claude_timeout: float = 300.0
@@ -43,6 +44,12 @@ class BotConfig:
 
         use_cli = os.getenv('USE_CLAUDE_CLI', 'false').lower() == 'true'
         anthropic_api_key = os.getenv('ANTHROPIC_API_KEY')
+        permission_mode = os.getenv('PERMISSION_MODE', 'interactive').lower()
+
+        # Validate permission mode
+        if permission_mode not in ['interactive', 'bypass']:
+            logger.warning(f"Invalid PERMISSION_MODE '{permission_mode}', defaulting to 'interactive'")
+            permission_mode = 'interactive'
 
         if not use_cli and not anthropic_api_key:
             raise ValueError(
@@ -54,12 +61,18 @@ class BotConfig:
         if not use_cli and anthropic_api_key:
             os.environ['ANTHROPIC_API_KEY'] = anthropic_api_key
 
-        logger.info(f"Configuration loaded - Mode: {'CLI' if use_cli else 'SDK'}")
+        # CLI mode doesn't support interactive permissions reliably (TTY required)
+        if use_cli and permission_mode == 'interactive':
+            logger.warning("CLI mode doesn't support interactive permissions (requires TTY). Using bypass mode instead.")
+            permission_mode = 'bypass'
+
+        logger.info(f"Configuration loaded - Mode: {'CLI' if use_cli else 'SDK'}, Permission: {permission_mode}")
 
         return cls(
             telegram_token=telegram_token,
             anthropic_api_key=anthropic_api_key,
-            use_cli=use_cli
+            use_cli=use_cli,
+            permission_mode=permission_mode
         )
 
 

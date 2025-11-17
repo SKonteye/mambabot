@@ -68,6 +68,7 @@ cp .env.example .env
 # TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
 # ANTHROPIC_API_KEY=your_anthropic_api_key_here  (only if USE_CLAUDE_CLI=false)
 # USE_CLAUDE_CLI=false  (set to 'true' to use globally installed claude command)
+# PERMISSION_MODE=interactive  (set to 'bypass' for auto-approval, SDK mode only)
 ```
 
 #### Choosing Between SDK and CLI Mode
@@ -77,6 +78,7 @@ cp .env.example .env
 - Requires `ANTHROPIC_API_KEY`
 - Uses the Claude Agent SDK library
 - Good for API-based integration
+- Supports interactive permission mode (see below)
 
 **CLI Mode**:
 - Set `USE_CLAUDE_CLI=true` in `.env`
@@ -84,13 +86,32 @@ cp .env.example .env
 - Uses your system's Claude CLI installation
 - Good if you already have Claude CLI configured
 - To install Claude CLI, visit: https://docs.claude.com/claude-code
-- Automatically uses `--permission-mode bypassPermissions` to auto-approve all tool usage
 - Each chat gets its own persistent session directory until `/clear` is called
+- Always uses bypass permissions (auto-approve all tools)
+
+#### Permission Modes
+
+You can choose between two permission modes:
+
+**Interactive Mode** (SDK only - Recommended for security):
+- Set `PERMISSION_MODE=interactive` in `.env`
+- **Requires `USE_CLAUDE_CLI=false`** (SDK mode)
+- You'll receive Telegram messages with Approve/Deny buttons when Claude wants to use tools
+- Each tool usage (file operations, bash commands, etc.) requires your explicit approval
+- More secure as you control what Claude can do
+- Great for learning what Claude is doing behind the scenes
+
+**Bypass Mode**:
+- Set `PERMISSION_MODE=bypass` in `.env`
+- All tool usage is automatically approved
+- Faster workflow but requires trust in Claude's actions
+- Works with both CLI and SDK modes
+- **CLI mode always uses this** (technical limitation)
 
 ### 5. Run the Bot
 
 ```bash
-python bot.py
+python run_bot.py
 ```
 
 You should see: `Bot started successfully! Send /start to begin.`
@@ -122,27 +143,28 @@ Simply send messages to your bot:
 
 1. **You send a message** to your bot on Telegram from anywhere
 2. **Bot forwards to Claude Code** running on your computer:
-   - **SDK Mode**: Uses Claude Agent SDK with `bypassPermissions`
-   - **CLI Mode**: Uses `claude --permission-mode bypassPermissions` (recommended)
-3. **Claude executes with full access**:
-   - Reads/writes files on your computer
-   - Runs bash commands and scripts
-   - Accesses your project files
-   - Takes screenshots
-   - **No permission prompts** - everything is auto-approved
+   - **SDK Mode**: Uses Claude Agent SDK
+     - `PERMISSION_MODE=interactive`: You approve/deny each tool via Telegram buttons
+     - `PERMISSION_MODE=bypass`: Auto-approves all tool usage
+   - **CLI Mode**: Uses Claude CLI with `--permission-mode bypassPermissions`
+     - Always auto-approves all tool usage (bypass only)
+3. **Claude executes based on permission mode**:
+   - **Interactive** (SDK only): You see approval requests for file operations, bash commands, etc.
+   - **Bypass**: Everything auto-approved (reads/writes files, runs commands, takes screenshots)
 4. **Response sent back** to you on Telegram
 5. **Conversation context maintained** across messages
 
-### CLI Mode Architecture (Recommended)
+### CLI Mode Architecture
 
-When using CLI mode (`USE_CLAUDE_CLI=true`), the bot leverages Claude Code's full capabilities:
+When using CLI mode (`USE_CLAUDE_CLI=true`), the bot operates as follows:
 
-- **Permission Mode**: `--permission-mode bypassPermissions` auto-approves ALL tool usage
-- **Print Mode**: Uses `claude --print --continue` for non-interactive output
-- **Session Continuity**: `--continue` flag maintains conversation context across messages
-- **Shared Session Directory**: Persistent session keeps conversation history
+- Uses `claude --print --permission-mode bypassPermissions`
+- Fast non-interactive output
+- All tools auto-approved
+- **Per-Chat Session Directories**: Each chat gets its own isolated session
 - **Concurrent Safe**: AsyncIO lock ensures safe concurrent access
 - **Clean Architecture**: Each message spawns a process that exits cleanly
+- **Session Continuity**: `--continue` flag maintains conversation context across messages
 
 ### What Claude Can Do (Auto-Approved)
 
@@ -218,36 +240,48 @@ telegram-claude-bot/
 
 ### ⚠️ Important Security Considerations
 
-**This bot has UNRESTRICTED access to your computer.** Anyone who can message your Telegram bot can:
+**When using bypass permissions** (CLI mode or SDK with `PERMISSION_MODE=bypass`), **this bot has UNRESTRICTED access to your computer.** Anyone who can message your Telegram bot can:
 - Read all your files
 - Execute arbitrary commands
 - Modify or delete data
 - Install software
 - Access your network
 
+**Interactive permission mode** (SDK with `PERMISSION_MODE=interactive`) provides better security:
+- You approve each tool usage via Telegram buttons
+- You can deny dangerous operations
+- You see exactly what Claude wants to do before it happens
+- Still requires trust in your judgment for each approval
+
 ### Recommended Security Measures
 
-1. **Keep Bot Token Private**:
+1. **Use Interactive Permission Mode**:
+   - Set `PERMISSION_MODE=interactive` when using SDK mode
+   - Approve each tool usage individually via Telegram
+   - Deny any suspicious or unexpected operations
+   - Review what files/commands Claude wants to access
+
+2. **Keep Bot Token Private**:
    - Never share your Telegram bot token
    - Never commit `.env` to version control
    - Treat it like a password to your computer
 
-2. **Restrict Bot Access**:
+3. **Restrict Bot Access**:
    - Only use this bot for personal use
    - Consider adding Telegram username whitelist in the code
    - Don't share your bot username with others
 
-3. **Network Security**:
+4. **Network Security**:
    - Run on a trusted network
    - Consider using a firewall
    - Be aware of what files/data are accessible
 
-4. **Monitor Usage**:
+5. **Monitor Usage**:
    - Check bot logs regularly
    - Review conversation history
    - Watch for unexpected behavior
 
-5. **Environment Variables**:
+6. **Environment Variables**:
    - Never commit `.env` file (already in `.gitignore`)
    - Keep API keys and tokens secure
    - Rotate credentials if compromised

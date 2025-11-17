@@ -7,7 +7,6 @@ import os
 import base64
 import logging
 import tempfile
-from typing import List
 from io import BytesIO
 
 from telegram import Update
@@ -17,16 +16,9 @@ from ..config import config, ERROR_MESSAGES
 from ..session import get_session_manager
 from ..utils import split_message, extract_image_paths, send_image_from_path, format_context_messages
 from ..claude_manager import get_claude_manager
+from ..interactive_sdk import query_claude_with_permissions, query_claude_bypass
 
 logger = logging.getLogger(__name__)
-
-# Only import SDK if not using CLI mode
-if not config.use_cli:
-    try:
-        from claude_agent_sdk import query
-        from claude_agent_sdk.types import ClaudeAgentOptions
-    except ImportError:
-        logger.warning("Claude SDK not installed. SDK mode will not work.")
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -94,14 +86,18 @@ async def _handle_text_message(
 
         # Choose between CLI and SDK based on configuration
         if config.use_cli:
-            # Use Claude CLI
-            logger.info("Using Claude CLI mode")
+            # Use Claude CLI (always bypass mode)
+            logger.info("Using Claude CLI mode with bypass permissions")
             claude_manager = await get_claude_manager()
-            assistant_message = await claude_manager.send_prompt(prompt)
+            assistant_message = await claude_manager.send_prompt(prompt, chat_id)
         else:
-            # Use SDK
-            logger.info("Using Claude SDK mode")
-            assistant_message, images = await _query_claude_sdk(prompt)
+            # Use SDK with permission mode
+            if config.permission_mode == 'interactive':
+                logger.info("Using Claude SDK mode with interactive permissions")
+                assistant_message, images = await query_claude_with_permissions(prompt, update, context)
+            else:
+                logger.info("Using Claude SDK mode with bypass permissions")
+                assistant_message, images = await query_claude_bypass(prompt)
 
         assistant_message = assistant_message.strip()
 
@@ -262,14 +258,18 @@ async def _process_with_image(
 
         # Choose between CLI and SDK based on configuration
         if config.use_cli:
-            # Use Claude CLI
-            logger.info("Using Claude CLI mode for image processing")
+            # Use Claude CLI (always bypass mode)
+            logger.info("Using Claude CLI mode for image processing with bypass permissions")
             claude_manager = await get_claude_manager()
-            assistant_message = await claude_manager.send_prompt(full_prompt)
+            assistant_message = await claude_manager.send_prompt(full_prompt, chat_id)
         else:
-            # Use SDK
-            logger.info("Using Claude SDK mode for image processing")
-            assistant_message, images = await _query_claude_sdk(full_prompt)
+            # Use SDK with permission mode
+            if config.permission_mode == 'interactive':
+                logger.info("Using Claude SDK mode for image processing with interactive permissions")
+                assistant_message, images = await query_claude_with_permissions(full_prompt, update, context)
+            else:
+                logger.info("Using Claude SDK mode for image processing with bypass permissions")
+                assistant_message, images = await query_claude_bypass(full_prompt)
 
         assistant_message = assistant_message.strip()
 
@@ -347,14 +347,18 @@ async def _process_with_file(
 
         # Choose between CLI and SDK based on configuration
         if config.use_cli:
-            # Use Claude CLI
-            logger.info("Using Claude CLI mode for file processing")
+            # Use Claude CLI (always bypass mode)
+            logger.info("Using Claude CLI mode for file processing with bypass permissions")
             claude_manager = await get_claude_manager()
-            assistant_message = await claude_manager.send_prompt(full_prompt)
+            assistant_message = await claude_manager.send_prompt(full_prompt, chat_id)
         else:
-            # Use SDK
-            logger.info("Using Claude SDK mode for file processing")
-            assistant_message, images = await _query_claude_sdk(full_prompt)
+            # Use SDK with permission mode
+            if config.permission_mode == 'interactive':
+                logger.info("Using Claude SDK mode for file processing with interactive permissions")
+                assistant_message, images = await query_claude_with_permissions(full_prompt, update, context)
+            else:
+                logger.info("Using Claude SDK mode for file processing with bypass permissions")
+                assistant_message, images = await query_claude_bypass(full_prompt)
 
         assistant_message = assistant_message.strip()
 
@@ -378,48 +382,6 @@ async def _process_with_file(
         await update.message.reply_text(f"❌ Error processing file: {str(e)}")
 
 
-async def _query_claude_sdk(prompt: str) -> tuple[str, List[dict]]:
-    """
-    Query Claude using the SDK.
-
-    Args:
-        prompt: The prompt to send
-
-    Returns:
-        Tuple of (response text, list of images)
-    """
-    assistant_message = ""
-    images = []
-
-    # Use bypassPermissions mode to auto-approve all tool uses
-    options = ClaudeAgentOptions(
-        permission_mode='bypassPermissions'
-    )
-
-    async for message in query(prompt=prompt, options=options):
-        # Only process TextResult messages with actual content
-        if hasattr(message, 'result') and message.result:
-            assistant_message += str(message.result)
-        # Check if message has content blocks (list format)
-        elif hasattr(message, 'content') and isinstance(message.content, list):
-            for content in message.content:
-                if hasattr(content, 'type'):
-                    if content.type == 'text':
-                        assistant_message += content.text
-                    elif content.type == 'image':
-                        # Handle image content
-                        if hasattr(content, 'source'):
-                            if content.source.type == 'base64':
-                                images.append({
-                                    'data': content.source.data,
-                                    'media_type': content.source.media_type
-                                })
-                            elif content.source.type == 'url':
-                                images.append({
-                                    'url': content.source.url
-                                })
-
-    return assistant_message, images
 
 
 async def _send_image(update: Update, image: dict):

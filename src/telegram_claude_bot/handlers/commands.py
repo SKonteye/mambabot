@@ -41,7 +41,7 @@ async def clear_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     chat_id = update.effective_chat.id
     session_manager = get_session_manager()
-    session_manager.clear_all(chat_id)
+    await session_manager.clear_all(chat_id)
 
     await update.message.reply_text("🗑️ Conversation history cleared!")
     logger.info(f"Cleared conversation history for chat {chat_id}")
