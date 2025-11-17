@@ -1,19 +1,20 @@
 # Telegram Claude Code Bot
 
-A Telegram bot that gives you **remote access to Claude Code** running on your computer. Control your local machine through Telegram messages with full access to Claude Code's agent capabilities - **all tool permissions automatically approved**.
+A Telegram bot that gives you **remote access to Claude Code** running on your computer. Control your local machine through Telegram messages with Claude Code's agent capabilities - with optional **interactive permission approval** via buttons.
 
-⚠️ **Security Warning**: This bot has unrestricted access to your computer via Claude Code. Only use it for personal use and keep your bot token private. Anyone with access to your Telegram bot can execute commands on your machine.
+⚠️ **Security Warning**: This bot can access your computer via Claude Code. Only use it for personal use and keep your bot token private. Anyone with access to your Telegram bot can potentially execute commands on your machine (depending on your permission mode settings).
 
 ## What This Bot Does
 
 - 🖥️ **Remote Computer Access**: Control Claude Code on your machine from anywhere via Telegram
-- 🔓 **Permission-Free Operation**: All Claude Code tools auto-approved (file operations, bash commands, code execution)
+- 🔐 **Interactive Permissions** (SDK mode): Approve/deny each tool via Telegram buttons for security
+- 🔓 **Bypass Mode**: Auto-approve all tools for faster operation (CLI mode default)
 - 📁 **Full File System Access**: Read, write, and modify files on your computer
 - 💻 **Command Execution**: Run bash commands and scripts through Claude
 - 🔧 **Code Operations**: Generate, debug, and refactor code with full project context
 - 📸 **Screenshot Capture**: Take and analyze screenshots remotely
 - 🖼️ **Image Analysis**: Send images for Claude to analyze
-- 🤖 **Persistent Sessions**: Maintains conversation context across messages
+- 🤖 **Persistent Sessions**: Maintains conversation context across messages (per-chat isolation)
 
 ## Prerequisites
 
