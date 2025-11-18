@@ -25,6 +25,7 @@ if not config.use_cli:
 
 async def query_claude_with_permissions(
     prompt: str,
+    history: List[dict],
     update: Update,
     context: ContextTypes.DEFAULT_TYPE
 ) -> tuple[str, List[dict]]:
@@ -35,7 +36,8 @@ async def query_claude_with_permissions(
     for approval before executing them.
 
     Args:
-        prompt: The prompt to send to Claude
+        prompt: The current prompt to send to Claude
+        history: Conversation history as list of {role, content} dicts
         update: Telegram update object for sending permission requests
         context: Telegram context object
 
@@ -46,6 +48,12 @@ async def query_claude_with_permissions(
     images = []
     permission_manager = get_permission_manager()
 
+    # Build messages array with history + current prompt
+    messages = []
+    for msg in history:
+        messages.append({"role": msg["role"], "content": msg["content"]})
+    messages.append({"role": "user", "content": prompt})
+
     # Determine permission mode
     if config.permission_mode == 'bypass':
         # Use bypassPermissions mode to auto-approve all tool uses
@@ -55,7 +63,7 @@ async def query_claude_with_permissions(
         options = ClaudeAgentOptions(permission_mode='ask')
 
     try:
-        async for message in query(prompt=prompt, options=options):
+        async for message in query(messages=messages, options=options):
             # Handle text results
             if hasattr(message, 'result') and message.result:
                 assistant_message += str(message.result)
@@ -113,12 +121,13 @@ async def query_claude_with_permissions(
     return assistant_message, images
 
 
-async def query_claude_bypass(prompt: str) -> tuple[str, List[dict]]:
+async def query_claude_bypass(prompt: str, history: List[dict]) -> tuple[str, List[dict]]:
     """
     Query Claude using the SDK with bypass permissions (auto-approve).
 
     Args:
-        prompt: The prompt to send to Claude
+        prompt: The current prompt to send to Claude
+        history: Conversation history as list of {role, content} dicts
 
     Returns:
         Tuple of (response text, list of images)
@@ -126,10 +135,16 @@ async def query_claude_bypass(prompt: str) -> tuple[str, List[dict]]:
     assistant_message = ""
     images = []
 
+    # Build messages array with history + current prompt
+    messages = []
+    for msg in history:
+        messages.append({"role": msg["role"], "content": msg["content"]})
+    messages.append({"role": "user", "content": prompt})
+
     # Use bypassPermissions mode to auto-approve all tool uses
     options = ClaudeAgentOptions(permission_mode='bypassPermissions')
 
-    async for message in query(prompt=prompt, options=options):
+    async for message in query(messages=messages, options=options):
         # Only process TextResult messages with actual content
         if hasattr(message, 'result') and message.result:
             assistant_message += str(message.result)

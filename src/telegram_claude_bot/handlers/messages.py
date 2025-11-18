@@ -74,30 +74,25 @@ async def _handle_text_message(
         session_manager = get_session_manager()
         history = session_manager.get_history(chat_id)
 
-        # Build the prompt with conversation history
-        if history:
-            context_str = format_context_messages(history, max_exchanges=10)
-            prompt = context_str + f"\n\nUser: {text}"
-        else:
-            prompt = text
-
         assistant_message = ""
         images = []
 
         # Choose between CLI and SDK based on configuration
         if config.use_cli:
             # Use Claude CLI (always bypass mode)
+            # CLI handles conversation history internally via --continue flag
             logger.info("Using Claude CLI mode with bypass permissions")
             claude_manager = await get_claude_manager()
-            assistant_message = await claude_manager.send_prompt(prompt, chat_id)
+            assistant_message = await claude_manager.send_prompt(text, chat_id)
         else:
             # Use SDK with permission mode
+            # SDK should receive structured messages, not text-prepended history
             if config.permission_mode == 'interactive':
                 logger.info("Using Claude SDK mode with interactive permissions")
-                assistant_message, images = await query_claude_with_permissions(prompt, update, context)
+                assistant_message, images = await query_claude_with_permissions(text, history, update, context)
             else:
                 logger.info("Using Claude SDK mode with bypass permissions")
-                assistant_message, images = await query_claude_bypass(prompt)
+                assistant_message, images = await query_claude_bypass(text, history)
 
         assistant_message = assistant_message.strip()
 
@@ -238,20 +233,12 @@ async def _process_with_image(
         session_manager = get_session_manager()
         history = session_manager.get_history(chat_id)
 
-        # Build prompt with conversation history and image reference
-        if history:
-            context_str = format_context_messages(history, max_exchanges=10)
-            full_prompt = (
-                context_str + f"\n\nUser: {text}\n\n"
-                f"User has sent an image saved at: {temp_image_path}\n"
-                f"Please analyze this image and respond to the user's request."
-            )
-        else:
-            full_prompt = (
-                f"{text}\n\n"
-                f"User has sent an image saved at: {temp_image_path}\n"
-                f"Please analyze this image and respond to the user's request."
-            )
+        # Build prompt with image reference
+        full_prompt = (
+            f"{text}\n\n"
+            f"User has sent an image saved at: {temp_image_path}\n"
+            f"Please analyze this image and respond to the user's request."
+        )
 
         assistant_message = ""
         images = []
@@ -259,17 +246,19 @@ async def _process_with_image(
         # Choose between CLI and SDK based on configuration
         if config.use_cli:
             # Use Claude CLI (always bypass mode)
+            # CLI handles conversation history internally via --continue flag
             logger.info("Using Claude CLI mode for image processing with bypass permissions")
             claude_manager = await get_claude_manager()
             assistant_message = await claude_manager.send_prompt(full_prompt, chat_id)
         else:
             # Use SDK with permission mode
+            # SDK should receive structured messages, not text-prepended history
             if config.permission_mode == 'interactive':
                 logger.info("Using Claude SDK mode for image processing with interactive permissions")
-                assistant_message, images = await query_claude_with_permissions(full_prompt, update, context)
+                assistant_message, images = await query_claude_with_permissions(full_prompt, history, update, context)
             else:
                 logger.info("Using Claude SDK mode for image processing with bypass permissions")
-                assistant_message, images = await query_claude_bypass(full_prompt)
+                assistant_message, images = await query_claude_bypass(full_prompt, history)
 
         assistant_message = assistant_message.strip()
 
@@ -335,12 +324,8 @@ async def _process_with_file(
         session_manager = get_session_manager()
         history = session_manager.get_history(chat_id)
 
-        # Build prompt with conversation history and file content
-        if history:
-            context_str = format_context_messages(history, max_exchanges=10)
-            full_prompt = context_str + f"\n\nUser: {text}\n\nFile content:\n{file_content[:4000]}"
-        else:
-            full_prompt = f"{text}\n\nFile content:\n{file_content[:4000]}"
+        # Build prompt with file content
+        full_prompt = f"{text}\n\nFile content:\n{file_content[:4000]}"
 
         assistant_message = ""
         images = []
@@ -348,17 +333,19 @@ async def _process_with_file(
         # Choose between CLI and SDK based on configuration
         if config.use_cli:
             # Use Claude CLI (always bypass mode)
+            # CLI handles conversation history internally via --continue flag
             logger.info("Using Claude CLI mode for file processing with bypass permissions")
             claude_manager = await get_claude_manager()
             assistant_message = await claude_manager.send_prompt(full_prompt, chat_id)
         else:
             # Use SDK with permission mode
+            # SDK should receive structured messages, not text-prepended history
             if config.permission_mode == 'interactive':
                 logger.info("Using Claude SDK mode for file processing with interactive permissions")
-                assistant_message, images = await query_claude_with_permissions(full_prompt, update, context)
+                assistant_message, images = await query_claude_with_permissions(full_prompt, history, update, context)
             else:
                 logger.info("Using Claude SDK mode for file processing with bypass permissions")
-                assistant_message, images = await query_claude_bypass(full_prompt)
+                assistant_message, images = await query_claude_bypass(full_prompt, history)
 
         assistant_message = assistant_message.strip()
 
