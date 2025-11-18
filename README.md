@@ -91,8 +91,8 @@ Bot: Let me check your code...
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/telegram-claude-bot.git
-cd telegram-claude-bot
+git clone https://github.com/SKonteye/mambabot.git
+cd mambabot
 
 # Create a virtual environment (recommended)
 python -m venv venv
