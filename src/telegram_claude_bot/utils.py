@@ -33,7 +33,17 @@ def split_message(text: str, max_length: int = 4000) -> List[str]:
     lines = text.split('\n')
 
     for line in lines:
-        if len(current_chunk) + len(line) + 1 > max_length:
+        # If a single line is longer than max_length, split it by characters
+        if len(line) > max_length:
+            # First, add any current chunk
+            if current_chunk:
+                chunks.append(current_chunk.strip())
+                current_chunk = ""
+
+            # Split the long line into character chunks
+            for i in range(0, len(line), max_length):
+                chunks.append(line[i:i + max_length])
+        elif len(current_chunk) + len(line) + 1 > max_length:
             if current_chunk:
                 chunks.append(current_chunk.strip())
             current_chunk = line + '\n'
