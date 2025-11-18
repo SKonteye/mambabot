@@ -1,4 +1,9 @@
-# Telegram Claude Code Bot
+# Telegram Claude Bot
+
+[![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Telegram Bot API](https://img.shields.io/badge/Telegram%20Bot%20API-21.9-blue.svg)](https://python-telegram-bot.org/)
+[![Claude Agent SDK](https://img.shields.io/badge/Claude%20Agent%20SDK-latest-orange.svg)](https://docs.anthropic.com/)
 
 A Telegram bot that gives you **remote access to Claude Code** running on your computer. Control your local machine through Telegram messages with Claude Code's agent capabilities - with optional **interactive permission approval** via buttons.
 
@@ -15,6 +20,48 @@ A Telegram bot that gives you **remote access to Claude Code** running on your c
 - 📸 **Screenshot Capture**: Take and analyze screenshots remotely
 - 🖼️ **Image Analysis**: Send images for Claude to analyze
 - 🤖 **Persistent Sessions**: Maintains conversation context across messages (per-chat isolation)
+
+## Demo
+
+### Interactive Permission Mode
+Get approval prompts with Approve/Deny buttons for every tool usage:
+
+```
+User: "Create a Python script to calculate fibonacci numbers"
+
+Bot: 🔐 Permission Request
+     Claude wants to use: Write
+     File: /path/to/fibonacci.py
+
+     [Approve] [Deny]
+```
+
+### Example Conversations
+
+**Code Generation:**
+```
+You: Write a function to validate email addresses in Python
+Bot: I'll create an email validation function for you...
+     ✅ Created validate_email.py with regex pattern matching
+```
+
+**File Operations:**
+```
+You: What Python files are in my project?
+Bot: I found 12 Python files:
+     - src/bot.py
+     - src/config.py
+     - src/utils.py
+     ...
+```
+
+**Remote Debugging:**
+```
+You: Debug why my API call is failing
+Bot: Let me check your code...
+     Found the issue in api_client.py:42
+     Missing authentication header. I'll fix it.
+```
 
 ## Prerequisites
 
@@ -43,8 +90,9 @@ A Telegram bot that gives you **remote access to Claude Code** running on your c
 ### 3. Install Dependencies
 
 ```bash
-# Clone or navigate to the project directory
-cd "Projet telegram"
+# Clone the repository
+git clone https://github.com/yourusername/telegram-claude-bot.git
+cd telegram-claude-bot
 
 # Create a virtual environment (recommended)
 python -m venv venv
@@ -182,6 +230,11 @@ When using CLI mode (`USE_CLAUDE_CLI=true`), the bot operates as follows:
 
 ```
 telegram-claude-bot/
+├── .github/
+│   └── ISSUE_TEMPLATE/             # GitHub issue templates
+│       ├── bug_report.md           # Bug report template
+│       ├── feature_request.md      # Feature request template
+│       └── config.yml              # Issue template config
 ├── src/
 │   └── telegram_claude_bot/        # Main package
 │       ├── __init__.py
@@ -196,13 +249,17 @@ telegram-claude-bot/
 │           ├── commands.py         # Command handlers
 │           ├── messages.py         # Message processing
 │           └── errors.py           # Error handling
+├── tests/                          # Test files
+│   ├── __init__.py
+│   ├── test_bot.py                 # Test suite
+│   └── test_config.py              # Configuration tests
 ├── run_bot.py                      # Entry point (use this to start)
-├── test_bot.py                     # Test suite
-├── test_config.py                  # Configuration tests
 ├── requirements.txt                # Python dependencies
 ├── .env.example                    # Environment template
 ├── .env                            # Your tokens (not in git)
 ├── .gitignore                      # Git exclusions
+├── CONTRIBUTING.md                 # Contribution guidelines
+├── CHANGELOG.md                    # Version history
 ├── LICENSE                         # MIT License
 └── README.md                       # This file
 ```
@@ -213,7 +270,7 @@ telegram-claude-bot/
 - Check that your bot is running (`python3 run_bot.py`)
 - Verify your tokens are correct in `.env`
 - Check the console for error messages
-- Run tests: `python3 test_bot.py`
+- Run tests: `python3 tests/test_bot.py`
 
 ### API errors
 - Ensure your Anthropic API key is valid
