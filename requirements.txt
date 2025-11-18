@@ -1,10 +1,12 @@
+# Core dependencies
 python-telegram-bot==21.9
 python-dotenv==1.0.1
-
-# Only required if USE_CLAUDE_CLI=false (SDK mode)
-# Uncomment if using SDK mode:
-# claude-agent-sdk
-# anyio
-
-# Type hints support
 typing-extensions>=4.8.0
+
+# Claude Agent SDK dependencies (required if USE_CLAUDE_CLI=false)
+# Install these for SDK mode:
+claude-agent-sdk
+anyio
+
+# Note: If you're using CLI mode (USE_CLAUDE_CLI=true), you only need the core dependencies.
+# The SDK dependencies will be unused but won't cause issues if installed.
